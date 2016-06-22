@@ -113,10 +113,9 @@ public class Ble_Activity extends Activity{
     private WifiManager wifiManager;
 
     // const string for protocol
-    public static final String GET_PHONE = "!0";
-    public static final String SET_PHONE = "!1";
-    public static final String SET_WIFI_SSID = "!2";
-    public static final String SET_WIFI_PWD = "!3";
+    public static final String SET_PHONE = "a";
+    public static final String SET_WIFI_SSID = "b";
+    public static final String SET_WIFI_PWD = "c";
 
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -229,8 +228,11 @@ public class Ble_Activity extends Activity{
     private void scanWifi(){
         List<android.net.wifi.ScanResult> wifiScanList = wifiManager.getScanResults();
         listSSID = new ArrayList<String>();
+        String id;
         for (int i = 0; i < wifiScanList.size(); i++) {
-            listSSID.add(((wifiScanList.get(i).SSID)));
+            id = wifiScanList.get(i).SSID;
+            if(!("".equals(id)))
+                listSSID.add(((id)));
         }
     }
 
@@ -465,29 +467,18 @@ public class Ble_Activity extends Activity{
 
     }
 
-    private void getPhoneNum(){
-        target_chara.setValue(GET_PHONE+"@");
-        mBluetoothLeService.writeCharacteristic(target_chara);
-    }
-
     private void setPhoneNumBLE(){
-        target_chara.setValue(SET_PHONE);
-        mBluetoothLeService.writeCharacteristic(target_chara);
-        target_chara.setValue(inputPhoneNum.getText()+"@");
+        target_chara.setValue(SET_PHONE+inputPhoneNum.getText()+"@");
         mBluetoothLeService.writeCharacteristic(target_chara);
     }
 
     private void setWifiSSIDBLE(){
-        target_chara.setValue(SET_WIFI_SSID);
-        mBluetoothLeService.writeCharacteristic(target_chara);
-        target_chara.setValue(spinnerWifiSSID.getSelectedItem().toString()+"@");
+        target_chara.setValue(SET_WIFI_SSID+spinnerWifiSSID.getSelectedItem().toString()+"@");
         mBluetoothLeService.writeCharacteristic(target_chara);
     }
 
     private void setSetWifiPwdBLE(){
-        target_chara.setValue(SET_WIFI_PWD);
-        mBluetoothLeService.writeCharacteristic(target_chara);
-        target_chara.setValue(inputWifiPwd.getText()+"@");
+        target_chara.setValue(SET_WIFI_PWD+inputWifiPwd.getText()+"@");
         mBluetoothLeService.writeCharacteristic(target_chara);
     }
 
