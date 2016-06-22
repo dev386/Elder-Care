@@ -37,6 +37,8 @@ import android.widget.TextView;
 import maclab.eldercare.R;
 import maclab.eldercare.service.BluetoothLeService;
 
+import static android.os.SystemClock.sleep;
+
 /**
  * 特別說明：HC_BLE助手是廣州匯承資訊科技有限公司獨自研發的手機APP，方便使用者調試08藍牙模組。
  * 本軟體只能支援安卓版本4.3並且有藍牙4.0的手機使用。
@@ -468,17 +470,23 @@ public class Ble_Activity extends Activity{
     }
 
     private void setPhoneNumBLE(){
-        target_chara.setValue(SET_PHONE+inputPhoneNum.getText()+"@");
+        String str=SET_PHONE+inputPhoneNum.getText().length()+"!"+inputPhoneNum.getText();
+        Log.d("proto",str);
+        target_chara.setValue(str);
         mBluetoothLeService.writeCharacteristic(target_chara);
     }
 
     private void setWifiSSIDBLE(){
-        target_chara.setValue(SET_WIFI_SSID+spinnerWifiSSID.getSelectedItem().toString()+"@");
+        String str = SET_WIFI_SSID+ spinnerWifiSSID.getSelectedItem().toString().length()+"!"+spinnerWifiSSID.getSelectedItem().toString();
+        Log.d("proto",str);
+        target_chara.setValue(str);
         mBluetoothLeService.writeCharacteristic(target_chara);
     }
 
     private void setSetWifiPwdBLE(){
-        target_chara.setValue(SET_WIFI_PWD+inputWifiPwd.getText()+"@");
+        String str = SET_WIFI_PWD+inputWifiPwd.getText().length()+"!"+inputWifiPwd.getText();
+        Log.d("proto",str);
+        target_chara.setValue(str);
         mBluetoothLeService.writeCharacteristic(target_chara);
     }
 
