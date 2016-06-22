@@ -66,9 +66,9 @@ void loop() {
   listenBLE();
   if(digitalRead(BTN_PIN) == LOW){ 
     Serial.println("Button Pressed");
-    sendHeartRate();
+    //sendHeartRate();
+    sendFallGPS();
     delay(1000);
-    Serial.println("send HeartBeat end");
   }
 
   if(LWiFi.status() == LWIFI_STATUS_CONNECTED)
@@ -109,54 +109,21 @@ void listenBLE(){
 }
 
 void sendHeartRate(){
-  Serial.println("send TCP heartBeat");
-
-  while(!c2.connect(SITE_URL, 80))
-  {
-    Serial.println("Re-connecting to Website");
-    delay(1000);
-  }
-  
-  //TODO: get heart rate from sensor
+  Serial.println("~~~send heartBeat~~~");
   String rate = String(random(40,150));
   String data = "HeartRate,,"+rate;
-  Serial.print("=>");
-  Serial.println(data);
+  pushDataToMCS(data);
+  Serial.println("~~~send heartBeat end~~~");
   
-  int dataLength = data.length();
-  c2.print("POST /mcs/v2/devices/");
-  c2.print(DEVICEID);
-  c2.println("/datapoints.csv HTTP/1.1");
-  c2.print("Host: ");
-  c2.println(SITE_URL);
-  c2.print("deviceKey: ");
-  c2.println(DEVICEKEY);
-  c2.print("Content-Length: ");
-  c2.println(dataLength);
-  c2.println("Content-Type: text/csv");
-  c2.println("Connection: close");
-  c2.println();
-  c2.println(data);
-
-  getResponse();
-  
-  while (c2)
-  {
-    int v = c2.read();
-    if (v != -1)
-    {
-      Serial.print(char(v));
-    }
-    else
-    {
-      Serial.println("no more content, disconnect");
-      c2.stop();
-
-    }
-    
-  }
 }
 
+void sendFallGPS(){
+  Serial.println("~~~send Fall GPS");
+  String gps = getGPS();
+  String data = "FallAlert,,"+gps;
+  pushDataToMCS(data);
+  Serial.println("~~~send GPS end~~~");
+}
 
 // ******* BLE other function******
 char* readStr() {
@@ -269,6 +236,53 @@ void getconnectInfo(){
 
 } //getconnectInfo
 
+void pushDataToMCS(String data)
+{
+  while(!c2.connect(SITE_URL, 80))
+  {
+    Serial.println("Re-connecting to Website");
+    delay(1000);
+  }
+  
+  //TODO: get heart rate from sensor
+  
+  Serial.print("=>");
+  Serial.println(data);
+  
+  int dataLength = data.length();
+  c2.print("POST /mcs/v2/devices/");
+  c2.print(DEVICEID);
+  c2.println("/datapoints.csv HTTP/1.1");
+  c2.print("Host: ");
+  c2.println(SITE_URL);
+  c2.print("deviceKey: ");
+  c2.println(DEVICEKEY);
+  c2.print("Content-Length: ");
+  c2.println(dataLength);
+  c2.println("Content-Type: text/csv");
+  c2.println("Connection: close");
+  c2.println();
+  c2.println(data);
+
+  getResponse();
+  
+  while (c2)
+  {
+    int v = c2.read();
+    if (v != -1)
+    {
+      Serial.print(char(v));
+    }
+    else
+    {
+      Serial.println("no more content, disconnect");
+      c2.stop();
+
+    }
+    
+  }
+}
+
 void getResponse(){
   delay(500);
 
@@ -292,4 +306,8 @@ void getResponse(){
   Serial.println();
 }
 
+// ***** GPS *********
+String getGPS(){
+  return "23,120,14";
+}
 
