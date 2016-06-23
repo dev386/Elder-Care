@@ -3,11 +3,14 @@
 #include <LWiFi.h>
 #include <LDateTime.h>
 #include <LWiFiClient.h>
+#include <LGPS.h>
+
 #define WIFI_AUTH LWIFI_WPA  // choose from LWIFI_OPEN, LWIFI_WPA, or LWIFI_WEP.
 
 #define DEVICEID "DhEOz10B" // Input your deviceId
 #define DEVICEKEY "4U0aJ1bTUQqLpjt0" // Input your deviceKey
 #define SITE_URL "api.mediatek.com"
+#define TRYTIME 5
 
 #define LED_PIN 13
 #define BTN_PIN 8
@@ -24,65 +27,70 @@ unsigned int rtc;
 unsigned int lrtc;
 unsigned int rtc1;
 unsigned int lrtc1;
-char port[4]={0};
-char connection_info[21]={0};
-char ip[21]={0};             
+char port[4] = {0};
+char connection_info[21] = {0};
+char ip[21] = {0};
 int portnum;
 int val = 0;
 String tcpdata = String(DEVICEID) + "," + String(DEVICEKEY) + ",";
 String upload_led;
 String tcpcmd_led_on = "LED_Control,1";
 String tcpcmd_led_off = "LED_Control,0";
-
 LWiFiClient c2;
 HttpClient http(c2);
 
+// ===GPS===
+gpsSentenceInfoStruct info;
+char buff[256];
+
 // ===main===
 void setup() {
-//Serial
+  //Serial
   Serial.begin(9600);   // 與電腦序列埠連線
   while (!Serial);
 
-//I/O
+  //I/O
   pinMode(LED_PIN, OUTPUT);
   pinMode(BTN_PIN, INPUT);
   randomSeed(analogRead(0));
 
-//BLE
+  //BLE
   Serial.println("BT is ready!");
   Serial1.begin(9600);
   phoneNum = '\0';
   wifiSSID = '\0';
   wifiPwd = '\0';
 
-//Wifi
+  //Wifi
   LTask.begin();
   LWiFi.begin();
 
+  //GPS
+  LGPS.powerOn();
+  Serial.println("LGPS Power on, and waiting ...");
+  delay(3000);
+
   digitalWrite(LED_PIN, LOW);
+  Serial.println("Setting done! Start looping!");
 }
 
 void loop() {
   listenBLE();
-  if(digitalRead(BTN_PIN) == LOW){ 
+  if (digitalRead(BTN_PIN) == LOW) {
     Serial.println("Button Pressed");
     //sendHeartRate();
     sendFallGPS();
     delay(1000);
   }
 
-  if(LWiFi.status() == LWIFI_STATUS_CONNECTED)
+  if (LWiFi.status() == LWIFI_STATUS_CONNECTED)
     digitalWrite(LED_PIN, HIGH);
   else
     digitalWrite(LED_PIN, LOW);
-  /*
-  else{
-    Serial.println("Loop end");
-    delay(1000);
-  }*/
+
 }
 
-void listenBLE(){
+void listenBLE() {
   // 若收到「序列埠監控視窗」的資料，則送到藍牙模組
   if (Serial.available()) {
     r = Serial.read();
@@ -105,45 +113,45 @@ void listenBLE(){
         connectAP();
         break;
     }
-  }  
+  }
 }
 
-void sendHeartRate(){
+void sendHeartRate() {
   Serial.println("~~~send heartBeat~~~");
-  String rate = String(random(40,150));
-  String data = "HeartRate,,"+rate;
+  String rate = String(random(40, 150));
+  String data = "HeartRate,," + rate;
   pushDataToMCS(data);
   Serial.println("~~~send heartBeat end~~~");
-  
+
 }
 
-void sendFallGPS(){
+void sendFallGPS() {
   Serial.println("~~~send Fall GPS");
   String gps = getGPS();
-  String data = "FallAlert,,"+gps;
+  String data = "FallAlert,," + gps;
   pushDataToMCS(data);
   Serial.println("~~~send GPS end~~~");
 }
 
 // ******* BLE other function******
 char* readStr() {
-  char* rev = (char*)malloc(MAXSTR*sizeof(char));
+  char* rev = (char*)malloc(MAXSTR * sizeof(char));
   char* tmp = rev;
-  int len=0;
+  int len = 0;
   do {
     r = Serial1.read();
-    len = len*10+r-'0';
-    
+    len = len * 10 + r - '0';
+
   } while (r != '!');
-  len = (len - '!'+'0')/10;
+  len = (len - '!' + '0') / 10;
   Serial.println(len);
   int i;
-  for(i=0;i<len;++i){
+  for (i = 0; i < len; ++i) {
     r = Serial1.read();
     /*
-    int num=r;
-    Serial.print("#");
-    Serial.print(num);
+      int num=r;
+      Serial.print("#");
+      Serial.print(num);
     */
     *rev = r;
     rev++;
@@ -156,13 +164,19 @@ char* readStr() {
 }
 
 // ****** Wifi other function**********
-void connectAP(){
+void connectAP() {
   Serial.println("Connecting to AP");
-  while (0 == LWiFi.connect(wifiSSID, LWiFiLoginInfo(WIFI_AUTH, wifiPwd)))
+  int retryCount = 0;
+  while (0 == LWiFi.connect(wifiSSID, LWiFiLoginInfo(WIFI_AUTH, wifiPwd)) && retryCount < TRYTIME)
   {
     delay(1000);
+    retryCount++;
   }
-  
+  if (retryCount == TRYTIME) {
+    Serial.println("connecting timeout! Please check the Wifi ssid and pwd");
+    return;
+  }
+
   Serial.println("calling connection");
 
   while (!c2.connect(SITE_URL, 80))
@@ -175,10 +189,10 @@ void connectAP(){
   Serial.println("---------mcs information--------");
   getconnectInfo();
   Serial.println("---------------------------------");
-  
+
 }
 
-void getconnectInfo(){
+void getconnectInfo() {
   //calling RESTful API to get TCP socket connection
   c2.print("GET /mcs/v2/devices/");
   c2.print(DEVICEID);
@@ -202,10 +216,10 @@ void getconnectInfo(){
     {
       c = v;
       Serial.print(c);
-      connection_info[ipcount]=c;
-      if(c==',')
-      separater=ipcount;
-      ipcount++;    
+      connection_info[ipcount] = c;
+      if (c == ',')
+        separater = ipcount;
+      ipcount++;
     }
     else
     {
@@ -213,19 +227,19 @@ void getconnectInfo(){
       c2.stop();
 
     }
-    
+
   }
   Serial.print("The connection info: ");
   Serial.println(connection_info);
   int i;
-  for(i=0;i<separater;i++)
-  {  ip[i]=connection_info[i];
+  for (i = 0; i < separater; i++)
+  { ip[i] = connection_info[i];
   }
-  int j=0;
+  int j = 0;
   separater++;
-  for(i=separater;i<21 && j<5;i++)
-  {  port[j]=connection_info[i];
-     j++;
+  for (i = separater; i < 21 && j < 5; i++)
+  { port[j] = connection_info[i];
+    j++;
   }
   Serial.println("The TCP Socket connection instructions:");
   Serial.print("IP: ");
@@ -238,17 +252,23 @@ void getconnectInfo(){
 
 void pushDataToMCS(String data)
 {
-  while(!c2.connect(SITE_URL, 80))
+  int retryCount = 0;
+  while ((!c2.connect(SITE_URL, 80)) && retryCount < TRYTIME )
   {
     Serial.println("Re-connecting to Website");
     delay(1000);
+    retryCount++;
   }
-  
+  if (retryCount == TRYTIME) {
+    Serial.println("network timeout");
+    //TODO: show user the error
+    return;
+  }
   //TODO: get heart rate from sensor
-  
+
   Serial.print("=>");
   Serial.println(data);
-  
+
   int dataLength = data.length();
   c2.print("POST /mcs/v2/devices/");
   c2.print(DEVICEID);
@@ -265,7 +285,7 @@ void pushDataToMCS(String data)
   c2.println(data);
 
   getResponse();
-  
+
   while (c2)
   {
     int v = c2.read();
@@ -279,11 +299,11 @@ void pushDataToMCS(String data)
       c2.stop();
 
     }
-    
+
   }
 }
 
-void getResponse(){
+void getResponse() {
   delay(500);
 
   int errorcount = 0;
@@ -307,7 +327,109 @@ void getResponse(){
 }
 
 // ***** GPS *********
-String getGPS(){
-  return "23,120,14";
+String getGPS() {
+  LGPS.getData(&info);
+  Serial.println((char*)info.GPGGA);
+  return parseGPGGA((const char*)info.GPGGA);
+}
+
+static unsigned char getComma(unsigned char num, const char *str)
+{
+  unsigned char i, j = 0;
+  int len = strlen(str);
+  for (i = 0; i < len; i ++)
+  {
+    if (str[i] == ',')
+      j++;
+    if (j == num)
+      return i + 1;
+  }
+  return 0;
+}
+
+static double getDoubleNumber(const char *s)
+{
+  char buf[10];
+  unsigned char i;
+  double rev;
+
+  i = getComma(1, s);
+  i = i - 1;
+  strncpy(buf, s, i);
+  buf[i] = 0;
+  rev = atof(buf);
+  return rev;
+}
+
+static double getIntNumber(const char *s)
+{
+  char buf[10];
+  unsigned char i;
+  double rev;
+
+  i = getComma(1, s);
+  i = i - 1;
+  strncpy(buf, s, i);
+  buf[i] = 0;
+  rev = atoi(buf);
+  return rev;
+}
+
+char* parseGPGGA(const char* GPGGAstr)
+{
+  /* Refer to http://www.gpsinformation.org/dale/nmea.htm#GGA
+     Sample data: $GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47
+     Where:
+      GGA          Global Positioning System Fix Data
+      123519       Fix taken at 12:35:19 UTC
+      4807.038,N   Latitude 48 deg 07.038' N
+      01131.000,E  Longitude 11 deg 31.000' E
+      1            Fix quality: 0 = invalid
+                                1 = GPS fix (SPS)
+                                2 = DGPS fix
+                                3 = PPS fix
+                                4 = Real Time Kinematic
+                                5 = Float RTK
+                                6 = estimated (dead reckoning) (2.3 feature)
+                                7 = Manual input mode
+                                8 = Simulation mode
+      08           Number of satellites being tracked
+      0.9          Horizontal dilution of position
+      545.4,M      Altitude, Meters, above mean sea level
+      46.9,M       Height of geoid (mean sea level) above WGS84
+                       ellipsoid
+      (empty field) time in seconds since last DGPS update
+      (empty field) DGPS station ID number
+   *  *47          the checksum data, always begins with *
+  */
+  double latitude;
+  double longitude;
+  double altitude;
+  int tmp, lat_deg, lon_deg;
+  //int hour, minute, second, num ;
+  if (GPGGAstr[0] == '$')
+  {
+    tmp = getComma(2, GPGGAstr);
+    latitude = getDoubleNumber(&GPGGAstr[tmp]);
+    tmp = getComma(4, GPGGAstr);
+    longitude = getDoubleNumber(&GPGGAstr[tmp]);
+    tmp = getComma(11, GPGGAstr);
+    altitude = getDoubleNumber(&GPGGAstr[tmp]);
+
+    //convert GPGGA(degree-mins-secs) to true decimal-degrees
+    lat_deg = int(latitude / 100);
+    lon_deg = int(longitude / 100);
+    latitude = lat_deg + (latitude - lat_deg * 100) / 60;
+    longitude = lon_deg + (longitude - lon_deg * 100) / 60;
+
+    sprintf(buff, "%.6f,%.6f,%.4f", latitude, longitude, altitude);
+    Serial.println(buff);
+
+  }
+  else
+  {
+    Serial.println("Not get data");
+  }
+  return buff;
 }
 
