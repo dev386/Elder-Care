@@ -5,6 +5,8 @@
 #include <LWiFiClient.h>
 #include <LGPS.h>
 #include <mthread.h>
+#include <LGSM.h>
+
 
 #define WIFI_AUTH LWIFI_WPA  // choose from LWIFI_OPEN, LWIFI_WPA, or LWIFI_WEP.
 
@@ -73,7 +75,8 @@ class MultiThread : public Thread
     double getDoubleNumber(const char *s);
     double getIntNumber(const char *s);
     char* parseGPGGA(const char* GPGGAstr);
-    
+    void callFamily();
+
     int id;
 
     LWiFiClient c2;
@@ -85,9 +88,9 @@ MultiThread::MultiThread(int id) {
 
 bool MultiThread::loop()
 {
-  
-  
-  
+
+
+
   // Die if requested:
   if (kill_flag)
     return false;
@@ -176,6 +179,7 @@ void MultiThread::senseHeartRate() {
   if (digitalRead(BTN_PIN) == LOW) {
     Serial.println("Button Pressed");
     sendHeartRate();
+    callFamily();
     //sendFallGPS();
     delay(1000);
   }
@@ -510,5 +514,22 @@ char* MultiThread::parseGPGGA(const char* GPGGAstr)
     Serial.println("Not get data");
   }
   return buff;
+}
+
+void MultiThread::callFamily() {
+  Serial.print("Calling to : ");
+  Serial.println(phoneNum);
+
+  if (LVoiceCall.voiceCall(phoneNum))
+  {
+    // call 3seccond
+    while(digitalRead(BTN_PIN) == HIGH) {};
+    delay(1000);
+    LVoiceCall.hangCall();
+  }
+  else{
+    Serial.println("Call failed");
+  }
+  Serial.println("Call Finished");
 }
 
