@@ -29,7 +29,7 @@
 MMA7660 accelemeter;
 
 // ===Heart rate===
-#define HEART_PIN = A0;
+#define HEART_PIN A0
 const double alpha = 0.5;              // smoothing
 const double beta = 0.5;                // find peak
 const int period = 20;                  // sample delay period
@@ -115,10 +115,12 @@ bool MultiThread::loop()
       listenBLE();
       break;
     case HEART_RATE_THREAD:
-      senseHeartRate();
+      if(LWiFi.status() == LWIFI_STATUS_CONNECTED)
+        sendHeartRate();
       break;
     case FALL_ALERT_THREAD:
-      senseFallGPS();
+      if(LWiFi.status() == LWIFI_STATUS_CONNECTED)
+        senseFallGPS();
       break;
     case WIFI_STATUS:
       showWifiStatus();
@@ -175,6 +177,8 @@ void MultiThread::senseFallGPS()
   //計算strength vector magnitude
   double SVM = sqrt(pow(ax, 2) + pow(ay, 2) + pow(az, 2));
   //如果SVM>3.2，表示有跌倒的可能
+  Serial.print("SVM :");
+  Serial.println(SVM);
   if (SVM >= 3.2)
   {
     sendFallGPS();
@@ -224,7 +228,7 @@ String MultiThread::senseHeartRate() {
 
   unsigned long startTime = millis();
   while (millis() - startTime < 10000) {      // sense 10 seconds
-    int rawValue = analogRead(sensorPin);
+    int rawValue = analogRead(HEART_PIN);
     double value = alpha * oldValue + (1 - alpha) * rawValue; //smoothing value
 
     //find peak
@@ -252,7 +256,9 @@ String MultiThread::cancelGPS()
 {
   String gps = getGPS();
   String cancel_gps;
-  char* command = strtok(gps, ",");
+  char* gpsChar;
+  gps.toCharArray(gpsChar, gps.length());
+  char* command = strtok(gpsChar, ",");
   while (command != 0)
   {
     cancel_gps += command;
