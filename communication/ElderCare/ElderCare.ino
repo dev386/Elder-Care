@@ -4,6 +4,7 @@
 #include <LDateTime.h>
 #include <LWiFiClient.h>
 #include <LGPS.h>
+#include <mthread.h>
 
 #define WIFI_AUTH LWIFI_WPA  // choose from LWIFI_OPEN, LWIFI_WPA, or LWIFI_WEP.
 
@@ -13,7 +14,12 @@
 #define TRYTIME 5
 
 #define LED_PIN 13
-#define BTN_PIN 8
+#define BTN_PIN 10
+
+#define BLE_THREAD 1
+#define HEART_RATE_THREAD 2
+#define FALL_ALERT_THREAD 3
+#define WIFI_STATUS 4
 // ===BLE===
 const char SET_PHONE = 'a';
 const char SET_WIFI_SSID = 'b';
@@ -36,12 +42,72 @@ String tcpdata = String(DEVICEID) + "," + String(DEVICEKEY) + ",";
 String upload_led;
 String tcpcmd_led_on = "LED_Control,1";
 String tcpcmd_led_off = "LED_Control,0";
-LWiFiClient c2;
-HttpClient http(c2);
 
 // ===GPS===
 gpsSentenceInfoStruct info;
 char buff[256];
+
+// ===Thread Class===
+
+class MultiThread : public Thread
+{
+  public:
+    MultiThread(int id);
+  protected:
+    bool loop();
+  private:
+    void listenBLE();
+    void senseHeartRate();
+    void senseFallGPS();
+    void showWifiStatus();
+
+    void sendHeartRate();
+    void sendFallGPS();
+    char* readStr();
+    void connectAP();
+    void getconnectInfo();
+    void pushDataToMCS(String data);
+    void getResponse();
+    String getGPS();
+    unsigned char getComma(unsigned char num, const char *str);
+    double getDoubleNumber(const char *s);
+    double getIntNumber(const char *s);
+    char* parseGPGGA(const char* GPGGAstr);
+    
+    int id;
+
+    LWiFiClient c2;
+};
+
+MultiThread::MultiThread(int id) {
+  this->id = id;
+}
+
+bool MultiThread::loop()
+{
+  
+  
+  
+  // Die if requested:
+  if (kill_flag)
+    return false;
+  switch (id) {
+    case BLE_THREAD:
+      listenBLE();
+      break;
+    case HEART_RATE_THREAD:
+      senseHeartRate();
+      break;
+    case FALL_ALERT_THREAD:
+      senseFallGPS();
+      break;
+    case WIFI_STATUS:
+      showWifiStatus();
+      break;
+  }
+  return true;
+
+}
 
 // ===main===
 void setup() {
@@ -72,25 +138,15 @@ void setup() {
 
   digitalWrite(LED_PIN, LOW);
   Serial.println("Setting done! Start looping!");
+
+  // start multi-thread
+  main_thread_list->add_thread(new MultiThread(BLE_THREAD));
+  main_thread_list->add_thread(new MultiThread(HEART_RATE_THREAD));
+  main_thread_list->add_thread(new MultiThread(FALL_ALERT_THREAD));
+  main_thread_list->add_thread(new MultiThread(WIFI_STATUS));
 }
 
-void loop() {
-  listenBLE();
-  if (digitalRead(BTN_PIN) == LOW) {
-    Serial.println("Button Pressed");
-    //sendHeartRate();
-    sendFallGPS();
-    delay(1000);
-  }
-
-  if (LWiFi.status() == LWIFI_STATUS_CONNECTED)
-    digitalWrite(LED_PIN, HIGH);
-  else
-    digitalWrite(LED_PIN, LOW);
-
-}
-
-void listenBLE() {
+void MultiThread::listenBLE() {
   // 若收到「序列埠監控視窗」的資料，則送到藍牙模組
   if (Serial.available()) {
     r = Serial.read();
@@ -116,16 +172,38 @@ void listenBLE() {
   }
 }
 
-void sendHeartRate() {
+void MultiThread::senseHeartRate() {
+  if (digitalRead(BTN_PIN) == LOW) {
+    Serial.println("Button Pressed");
+    sendHeartRate();
+    //sendFallGPS();
+    delay(1000);
+  }
+}
+
+void MultiThread::senseFallGPS() {
+
+}
+
+void MultiThread::showWifiStatus() {
+  if (LWiFi.status() == LWIFI_STATUS_CONNECTED)
+    digitalWrite(LED_PIN, HIGH);
+  else
+    digitalWrite(LED_PIN, LOW);
+}
+
+void MultiThread::sendHeartRate() {
   Serial.println("~~~send heartBeat~~~");
   String rate = String(random(40, 150));
   String data = "HeartRate,," + rate;
+  Serial.print("data is");
+  Serial.println(data);
   pushDataToMCS(data);
   Serial.println("~~~send heartBeat end~~~");
 
 }
 
-void sendFallGPS() {
+void MultiThread::sendFallGPS() {
   Serial.println("~~~send Fall GPS");
   String gps = getGPS();
   String data = "FallAlert,," + gps;
@@ -134,7 +212,7 @@ void sendFallGPS() {
 }
 
 // ******* BLE other function******
-char* readStr() {
+char* MultiThread::readStr() {
   char* rev = (char*)malloc(MAXSTR * sizeof(char));
   char* tmp = rev;
   int len = 0;
@@ -164,7 +242,7 @@ char* readStr() {
 }
 
 // ****** Wifi other function**********
-void connectAP() {
+void MultiThread::connectAP() {
   Serial.println("Connecting to AP");
   int retryCount = 0;
   while (0 == LWiFi.connect(wifiSSID, LWiFiLoginInfo(WIFI_AUTH, wifiPwd)) && retryCount < TRYTIME)
@@ -192,7 +270,7 @@ void connectAP() {
 
 }
 
-void getconnectInfo() {
+void MultiThread::getconnectInfo() {
   //calling RESTful API to get TCP socket connection
   c2.print("GET /mcs/v2/devices/");
   c2.print(DEVICEID);
@@ -250,7 +328,7 @@ void getconnectInfo() {
 
 } //getconnectInfo
 
-void pushDataToMCS(String data)
+void MultiThread::pushDataToMCS(String data)
 {
   int retryCount = 0;
   while ((!c2.connect(SITE_URL, 80)) && retryCount < TRYTIME )
@@ -264,7 +342,6 @@ void pushDataToMCS(String data)
     //TODO: show user the error
     return;
   }
-  //TODO: get heart rate from sensor
 
   Serial.print("=>");
   Serial.println(data);
@@ -303,7 +380,7 @@ void pushDataToMCS(String data)
   }
 }
 
-void getResponse() {
+void MultiThread::getResponse() {
   delay(500);
 
   int errorcount = 0;
@@ -318,6 +395,8 @@ void getResponse() {
     }
     delay(100);
   }
+
+  HttpClient http(c2);
   int err = http.skipResponseHeaders();
 
   int bodyLen = http.contentLength();
@@ -327,13 +406,13 @@ void getResponse() {
 }
 
 // ***** GPS *********
-String getGPS() {
+String MultiThread::getGPS() {
   LGPS.getData(&info);
   Serial.println((char*)info.GPGGA);
   return parseGPGGA((const char*)info.GPGGA);
 }
 
-static unsigned char getComma(unsigned char num, const char *str)
+unsigned char MultiThread::getComma(unsigned char num, const char *str)
 {
   unsigned char i, j = 0;
   int len = strlen(str);
@@ -347,7 +426,7 @@ static unsigned char getComma(unsigned char num, const char *str)
   return 0;
 }
 
-static double getDoubleNumber(const char *s)
+double MultiThread::getDoubleNumber(const char *s)
 {
   char buf[10];
   unsigned char i;
@@ -361,7 +440,7 @@ static double getDoubleNumber(const char *s)
   return rev;
 }
 
-static double getIntNumber(const char *s)
+double MultiThread::getIntNumber(const char *s)
 {
   char buf[10];
   unsigned char i;
@@ -375,7 +454,7 @@ static double getIntNumber(const char *s)
   return rev;
 }
 
-char* parseGPGGA(const char* GPGGAstr)
+char* MultiThread::parseGPGGA(const char* GPGGAstr)
 {
   /* Refer to http://www.gpsinformation.org/dale/nmea.htm#GGA
      Sample data: $GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47
