@@ -6,7 +6,9 @@
 #include <LGPS.h>
 #include <mthread.h>
 #include <LGSM.h>
-
+//3-axis
+#include <Wire.h>
+#include "MMA7660.h"
 
 #define WIFI_AUTH LWIFI_WPA  // choose from LWIFI_OPEN, LWIFI_WPA, or LWIFI_WEP.
 
@@ -22,6 +24,19 @@
 #define HEART_RATE_THREAD 2
 #define FALL_ALERT_THREAD 3
 #define WIFI_STATUS 4
+
+// ===3-axis accelemeter===
+MMA7660 accelemeter;
+
+// ===Heart rate===
+#define HEART_PIN = A0;
+const double alpha = 0.5;              // smoothing
+const double beta = 0.5;                // find peak
+const int period = 20;                  // sample delay period
+
+// ===Cancel Sensor===
+#define TOUCH_PIN 8
+
 // ===BLE===
 const char SET_PHONE = 'a';
 const char SET_WIFI_SSID = 'b';
@@ -59,12 +74,14 @@ class MultiThread : public Thread
     bool loop();
   private:
     void listenBLE();
-    void senseHeartRate();
+    String senseHeartRate();
     void senseFallGPS();
     void showWifiStatus();
 
     void sendHeartRate();
     void sendFallGPS();
+    void sendCancel();
+    String cancelGPS();
     char* readStr();
     void connectAP();
     void getconnectInfo();
@@ -76,7 +93,6 @@ class MultiThread : public Thread
     double getIntNumber(const char *s);
     char* parseGPGGA(const char* GPGGAstr);
     void callFamily();
-
     int id;
 
     LWiFiClient c2;
@@ -121,6 +137,7 @@ void setup() {
   //I/O
   pinMode(LED_PIN, OUTPUT);
   pinMode(BTN_PIN, INPUT);
+  pinMode(TOUCH_PIN, INPUT);
   randomSeed(analogRead(0));
 
   //BLE
@@ -149,6 +166,29 @@ void setup() {
   main_thread_list->add_thread(new MultiThread(WIFI_STATUS));
 }
 
+void MultiThread::senseFallGPS()
+{
+  float ax, ay, az;
+  accelemeter.getAcceleration(&ax, &ay, &az);
+  //計算strength vector magnitude
+  double SVM = sqrt(pow(ax, 2) + pow(ay, 2) + pow(az, 2));
+  //如果SVM>3.2，表示有跌倒的可能
+  if (SVM >= 3.2)
+  {
+    sendFallGPS();
+    delay(1000);
+    //10秒內等待觸摸取消鍵則取消緊急通報
+    int cancel = digitalRead(TOUCH_PIN);
+    unsigned long startTime = millis();         // 記錄開始時間
+    while (millis() - startTime < 10000) {      // sense 10 seconds
+      if (TOUCH_PIN == 1)
+      {
+        sendCancel();
+      }
+    }
+  }
+}
+
 void MultiThread::listenBLE() {
   // 若收到「序列埠監控視窗」的資料，則送到藍牙模組
   if (Serial.available()) {
@@ -175,18 +215,49 @@ void MultiThread::listenBLE() {
   }
 }
 
-void MultiThread::senseHeartRate() {
-  if (digitalRead(BTN_PIN) == LOW) {
-    Serial.println("Button Pressed");
-    sendHeartRate();
-    callFamily();
-    //sendFallGPS();
-    delay(1000);
+String MultiThread::senseHeartRate() {
+  int count = 0;
+  double oldValue = 0;
+  double oldChange = 0;
+
+  unsigned long startTime = millis();
+  while (millis() - startTime < 10000) {      // sense 10 seconds
+    int rawValue = analogRead(sensorPin);
+    double value = alpha * oldValue + (1 - alpha) * rawValue; //smoothing value
+
+    //find peak
+    double change = value - oldValue;
+    if (change > beta && oldChange < -beta) { // heart beat
+      count = count + 1;
+    }
+
+    oldValue = value;
+    oldChange = change;
+    delay(period);
   }
+  return String((count * 6));
 }
 
-void MultiThread::senseFallGPS() {
+void MultiThread::sendCancel() {
+  Serial.println("~~~send Cancel~~~");
+  String cancel_gps = cancelGPS();
+  String data = "FallAlert,," + cancel_gps;
+  pushDataToMCS(data);
+  Serial.println("~~~send Cancel end~~~");
+}
 
+String MultiThread::cancelGPS()
+{
+  String gps = getGPS();
+  String cancel_gps;
+  char* command = strtok(gps, ",");
+  while (command != 0)
+  {
+    cancel_gps += command;
+    command = strtok(0, ",");
+  }
+  cancel_gps += "-999";
+  return cancel_gps;
 }
 
 void MultiThread::showWifiStatus() {
@@ -198,7 +269,7 @@ void MultiThread::showWifiStatus() {
 
 void MultiThread::sendHeartRate() {
   Serial.println("~~~send heartBeat~~~");
-  String rate = String(random(40, 150));
+  String rate = senseHeartRate();
   String data = "HeartRate,," + rate;
   Serial.print("data is");
   Serial.println(data);
