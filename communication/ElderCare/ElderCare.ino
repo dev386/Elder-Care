@@ -126,6 +126,8 @@ void setup() {
   //BLE
   Serial.println("BT is ready!");
   Serial1.begin(9600);
+
+  
   phoneNum = '\0';
   wifiSSID = '\0';
   wifiPwd = '\0';
@@ -520,16 +522,18 @@ void MultiThread::callFamily() {
   Serial.print("Calling to : ");
   Serial.println(phoneNum);
 
-  if (LVoiceCall.voiceCall(phoneNum))
+  if (LSMS.ready()!=0 && LVoiceCall.voiceCall(phoneNum))
   {
-    // call 3seccond
+    Serial.println("Start calling...");
+    // call until press button
     while(digitalRead(BTN_PIN) == HIGH) {};
     delay(1000);
     LVoiceCall.hangCall();
+    Serial.println("Call Finished");
   }
   else{
     Serial.println("Call failed");
   }
-  Serial.println("Call Finished");
+  
 }
 
