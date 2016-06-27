@@ -33,6 +33,7 @@ MMA7660 accelemeter;
 const double alpha = 0.5;              // smoothing
 const double beta = 0.5;                // find peak
 const int period = 20;                  // sample delay period
+unsigned long endTime = millis() - 55000;                  //time when the sense heart rate ends
 
 // ===Cancel Sensor===
 #define TOUCH_PIN 8
@@ -227,7 +228,7 @@ String MultiThread::senseHeartRate() {
   double oldChange = 0;
 
   unsigned long startTime = millis();
-  while (millis() - startTime < 10000) {      // sense 10 seconds
+  while (millis() - startTime < 5000) {      // sense 5 seconds
     int rawValue = analogRead(HEART_PIN);
     double value = alpha * oldValue + (1 - alpha) * rawValue; //smoothing value
 
@@ -241,7 +242,8 @@ String MultiThread::senseHeartRate() {
     oldChange = change;
     delay(period);
   }
-  return String((count * 6));
+   endTime = millis();
+  return String((count * 12));
 }
 
 void MultiThread::sendCancel() {
@@ -276,14 +278,16 @@ void MultiThread::showWifiStatus() {
 }
 
 void MultiThread::sendHeartRate() {
-  Serial.println("~~~send heartBeat~~~");
-  String rate = senseHeartRate();
-  String data = "HeartRate,," + rate;
-  Serial.print("data is");
-  Serial.println(data);
-  pushDataToMCS(data);
-  Serial.println("~~~send heartBeat end~~~");
-
+  if(millis() - endTime >= 55000) //sense 5 seconds, stop sensing for the next 55 seconds
+  {
+    Serial.println("~~~send heartBeat~~~");
+    String rate = senseHeartRate();
+    String data = "HeartRate,," + rate;
+    Serial.print("data is");
+    Serial.println(data);
+    pushDataToMCS(data);
+    Serial.println("~~~send heartBeat end~~~");
+  }
 }
 
 void MultiThread::sendFallGPS() {
