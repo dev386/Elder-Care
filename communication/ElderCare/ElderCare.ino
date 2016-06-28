@@ -18,7 +18,6 @@
 #define TRYTIME 5
 
 #define LED_PIN 13
-#define BTN_PIN 10
 
 #define BLE_THREAD 1
 #define HEART_RATE_THREAD 2
@@ -27,13 +26,17 @@
 
 // ===3-axis accelemeter===
 MMA7660 accelemeter;
+const double SVM_THREASHOLD = 1.8;
 
 // ===Heart rate===
 #define HEART_PIN A0
-const double alpha = 0.5;              // smoothing
-const double beta = 0.5;                // find peak
+#define MIN 60000
+#define SENSE_HEART_SEC 10000
+#define WAIT_HEART_SEC MIN-SENSE_HEART_SEC
+const double alpha = 0;              // smoothing
+const double beta = 0.45;                // find peak
 const int period = 20;                  // sample delay period
-unsigned long endTime = millis() - 55000;                  //time when the sense heart rate ends
+unsigned long endTime = millis() - WAIT_HEART_SEC;                  //time when the sense heart rate ends
 
 // ===Cancel Sensor===
 #define TOUCH_PIN 8
@@ -135,11 +138,12 @@ bool MultiThread::loop()
 void setup() {
   //Serial
   Serial.begin(9600);   // 與電腦序列埠連線
-  while (!Serial);
+  //while (!Serial);
+
+  accelemeter.init();
 
   //I/O
   pinMode(LED_PIN, OUTPUT);
-  pinMode(BTN_PIN, INPUT);
   pinMode(TOUCH_PIN, INPUT);
   randomSeed(analogRead(0));
 
@@ -180,17 +184,23 @@ void MultiThread::senseFallGPS()
   //如果SVM>3.2，表示有跌倒的可能
   Serial.print("SVM :");
   Serial.println(SVM);
-  if (SVM >= 3.2)
+  String bleSVM = "!"+String(SVM);
+  Serial1.println(bleSVM);
+  Serial1.flush();
+  if (SVM >= SVM_THREASHOLD)
   {
     sendFallGPS();
+    callFamily();
     delay(1000);
     //10秒內等待觸摸取消鍵則取消緊急通報
     int cancel = digitalRead(TOUCH_PIN);
     unsigned long startTime = millis();         // 記錄開始時間
-    while (millis() - startTime < 10000) {      // sense 10 seconds
+    while (millis() - startTime < SENSE_HEART_SEC) {      // sense 10 seconds
       if (TOUCH_PIN == 1)
       {
         sendCancel();
+        delay(1000);
+        break;
       }
     }
   }
@@ -242,8 +252,8 @@ String MultiThread::senseHeartRate() {
     oldChange = change;
     delay(period);
   }
-   endTime = millis();
-  return String((count * 12));
+  endTime = millis();
+  return String((count * MIN/SENSE_HEART_SEC));
 }
 
 void MultiThread::sendCancel() {
@@ -278,7 +288,7 @@ void MultiThread::showWifiStatus() {
 }
 
 void MultiThread::sendHeartRate() {
-  if(millis() - endTime >= 55000) //sense 5 seconds, stop sensing for the next 55 seconds
+  if(millis() - endTime >= WAIT_HEART_SEC) //sense 5 seconds, stop sensing for the next 55 seconds
   {
     Serial.println("~~~send heartBeat~~~");
     String rate = senseHeartRate();
@@ -607,7 +617,7 @@ void MultiThread::callFamily() {
   {
     Serial.println("Start calling...");
     // call until press button
-    while(digitalRead(BTN_PIN) == HIGH) {};
+    while(digitalRead(TOUCH_PIN) == LOW) {};
     delay(1000);
     LVoiceCall.hangCall();
     Serial.println("Call Finished");
