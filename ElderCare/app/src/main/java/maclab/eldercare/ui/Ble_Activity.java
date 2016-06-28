@@ -3,6 +3,7 @@ package maclab.eldercare.ui;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+
 import android.app.Activity;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
@@ -44,20 +45,21 @@ import static android.os.SystemClock.sleep;
  * 本軟體只能支援安卓版本4.3並且有藍牙4.0的手機使用。
  * 另外對於自家的05、06模組，要使用另外一套藍牙2.0的手機APP，用戶可以在匯承官方網的下載中心自行下載。
  * 本軟體提供代碼和注釋，免費給購買匯承08模組的使用者學習和研究，但不能用於商業開發，最終解析權在廣州匯承資訊科技有限公司。
- * **/
+ **/
 
 /**
- * @Description:  TODO<Ble_Activity實現連接BLE,發送和接受BLE的資料>
- * @author  廣州匯承資訊科技有限公司
- * @data:  2014-10-20 下午12:12:04
- * @version:  V1.0
+ * @author 廣州匯承資訊科技有限公司
+ * @Description: TODO<Ble_Activity實現連接BLE,發送和接受BLE的資料>
+ * @data: 2014-10-20 下午12:12:04
+ * @version: V1.0
  */
-public class Ble_Activity extends Activity{
+public class Ble_Activity extends Activity {
 
     private final static String TAG = Ble_Activity.class.getSimpleName();
     //藍牙4.0的UUID,其中0000ffe1-0000-1000-8000-00805f9b34fb是廣州匯承資訊科技有限公司08藍牙模組的UUID
     public static String HEART_RATE_MEASUREMENT = "0000ffe1-0000-1000-8000-00805f9b34fb";
-    public static String EXTRAS_DEVICE_NAME = "DEVICE_NAME";;
+    public static String EXTRAS_DEVICE_NAME = "DEVICE_NAME";
+    ;
     public static String EXTRAS_DEVICE_ADDRESS = "DEVICE_ADDRESS";
     public static String EXTRAS_DEVICE_RSSI = "RSSI";
     //藍牙連接狀態
@@ -80,19 +82,15 @@ public class Ble_Activity extends Activity{
     //藍牙特徵值
     private static BluetoothGattCharacteristic target_chara = null;
     private Handler mhandler = new Handler();
-    private Handler myHandler = new Handler()
-    {
+    private Handler myHandler = new Handler() {
         // 2.重寫消息處理函數
-        public void handleMessage(Message msg)
-        {
-            switch (msg.what)
-            {
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
                 // 判斷發送的消息
-                case 1:
-                {
+                case 1: {
                     // 更新View
                     String state = msg.getData().getString("connect_state");
-                    connect_state.setText("bluetooth : "+state);
+                    connect_state.setText("bluetooth : " + state);
 
                     break;
                 }
@@ -113,6 +111,7 @@ public class Ble_Activity extends Activity{
     private String wifiSSID;
     private ArrayList<String> listSSID;
     private WifiManager wifiManager;
+    private TextView svmTv;
 
     // const string for protocol
     public static final String SET_PHONE = "a";
@@ -120,8 +119,7 @@ public class Ble_Activity extends Activity{
     public static final String SET_WIFI_PWD = "c";
 
     @Override
-    protected void onCreate(Bundle savedInstanceState)
-    {
+    protected void onCreate(Bundle savedInstanceState) {
         // TODO Auto-generated method stub
         super.onCreate(savedInstanceState);
         setContentView(R.layout.ble_activity);
@@ -133,7 +131,7 @@ public class Ble_Activity extends Activity{
         spinnerWifiSSID = (Spinner) findViewById(R.id.spinner_wifi);
         connect_state = (TextView) this.findViewById(R.id.connect_state);
         wifiManager = (WifiManager) this.getSystemService(Context.WIFI_SERVICE);
-
+        svmTv = (TextView) findViewById(R.id.tv_svm);
 
 
         b = getIntent().getExtras();
@@ -150,8 +148,7 @@ public class Ble_Activity extends Activity{
     }
 
     @Override
-    protected void onDestroy()
-    {
+    protected void onDestroy() {
         super.onDestroy();
         //解除廣播接收器
         unregisterReceiver(mGattUpdateReceiver);
@@ -160,13 +157,11 @@ public class Ble_Activity extends Activity{
 
     // Activity出來時候，綁定廣播接收器，監聽藍牙連接服務傳過來的事件
     @Override
-    protected void onResume()
-    {
+    protected void onResume() {
         super.onResume();
         //綁定廣播接收器
         registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
-        if (mBluetoothLeService != null)
-        {
+        if (mBluetoothLeService != null) {
             //根據藍牙位址，建立連接
             final boolean result = mBluetoothLeService.connect(mDeviceAddress);
             Log.d(TAG, "Connect request result=" + result);
@@ -175,14 +170,13 @@ public class Ble_Activity extends Activity{
     }
 
     /**
-     * @Title: init
-     * @Description: TODO(初始化UI控制項)
      * @param
      * @return void
      * @throws
+     * @Title: init
+     * @Description: TODO(初始化UI控制項)
      */
-    private void init()
-    {
+    private void init() {
         connect_state.setText("Bluetooth : " + status);
 
         scanWifi();
@@ -227,29 +221,26 @@ public class Ble_Activity extends Activity{
         });
     }
 
-    private void scanWifi(){
+    private void scanWifi() {
         List<android.net.wifi.ScanResult> wifiScanList = wifiManager.getScanResults();
         listSSID = new ArrayList<String>();
         String id;
         for (int i = 0; i < wifiScanList.size(); i++) {
             id = wifiScanList.get(i).SSID;
-            if(!("".equals(id)))
+            if (!("".equals(id)))
                 listSSID.add(((id)));
         }
     }
 
     /* BluetoothLeService綁定的回呼函數 */
-    private final ServiceConnection mServiceConnection = new ServiceConnection()
-    {
+    private final ServiceConnection mServiceConnection = new ServiceConnection() {
 
         @Override
         public void onServiceConnected(ComponentName componentName,
-                                       IBinder service)
-        {
+                                       IBinder service) {
             mBluetoothLeService = ((BluetoothLeService.LocalBinder) service)
                     .getService();
-            if (!mBluetoothLeService.initialize())
-            {
+            if (!mBluetoothLeService.initialize()) {
                 Log.e(TAG, "Unable to initialize Bluetooth");
                 finish();
             }
@@ -261,8 +252,7 @@ public class Ble_Activity extends Activity{
         }
 
         @Override
-        public void onServiceDisconnected(ComponentName componentName)
-        {
+        public void onServiceDisconnected(ComponentName componentName) {
             mBluetoothLeService = null;
         }
 
@@ -271,11 +261,9 @@ public class Ble_Activity extends Activity{
     /**
      * 廣播接收器，負責接收BluetoothLeService類發送的資料
      */
-    private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver()
-    {
+    private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context context, Intent intent)
-        {
+        public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
             if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action))//Gatt連接成功
             {
@@ -286,8 +274,7 @@ public class Ble_Activity extends Activity{
                 System.out.println("BroadcastReceiver :" + "device connected");
 
             } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED//Gatt連接失敗
-                    .equals(action))
-            {
+                    .equals(action)) {
                 mConnected = false;
                 status = "disconnected";
                 //更新連接狀態
@@ -296,8 +283,7 @@ public class Ble_Activity extends Activity{
                         + "device disconnected");
 
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED//發現GATT伺服器
-                    .equals(action))
-            {
+                    .equals(action)) {
                 // Show all the supported services and characteristics on the
                 // user interface.
                 //獲取設備的所有藍牙服務
@@ -317,8 +303,7 @@ public class Ble_Activity extends Activity{
     };
 
     /* 更新連接狀態 */
-    private void updateConnectionState(String status)
-    {
+    private void updateConnectionState(String status) {
         Message msg = new Message();
         msg.what = 1;
         Bundle b = new Bundle();
@@ -331,8 +316,7 @@ public class Ble_Activity extends Activity{
     }
 
     /* 意圖篩檢程式 */
-    private static IntentFilter makeGattUpdateIntentFilter()
-    {
+    private static IntentFilter makeGattUpdateIntentFilter() {
         final IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_CONNECTED);
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_DISCONNECTED);
@@ -343,22 +327,22 @@ public class Ble_Activity extends Activity{
     }
 
     /**
-     * @Title: displayData
-     * @Description: TODO(接收到的資料在scrollview上顯示)
      * @param @param rev_string(接受的數據)
      * @return void
      * @throws
+     * @Title: displayData
+     * @Description: TODO(接收到的資料在scrollview上顯示)
      */
-    private void displayData(final String rev_string)
-    {
+    private void displayData(final String rev_string) {
         rev_str = rev_string;
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
 
+                Log.d("proto", rev_str);
                 switch (rev_str.charAt(0)) {
                     case '!':
-                        inputPhoneNum.setText(rev_string.substring(1));
+                        svmTv.setText(rev_str);
                         break;
                 }
 
@@ -368,14 +352,13 @@ public class Ble_Activity extends Activity{
     }
 
     /**
-     * @Title: displayGattServices
-     * @Description: TODO(處理藍牙服務)
      * @param
      * @return void
      * @throws
+     * @Title: displayGattServices
+     * @Description: TODO(處理藍牙服務)
      */
-    private void displayGattServices(List<BluetoothGattService> gattServices)
-    {
+    private void displayGattServices(List<BluetoothGattService> gattServices) {
 
         if (gattServices == null)
             return;
@@ -393,8 +376,7 @@ public class Ble_Activity extends Activity{
         mGattCharacteristics = new ArrayList<ArrayList<BluetoothGattCharacteristic>>();
 
         // Loops through available GATT Services.
-        for (BluetoothGattService gattService : gattServices)
-        {
+        for (BluetoothGattService gattService : gattServices) {
 
             // 獲取服務清單
             HashMap<String, String> currentServiceData = new HashMap<String, String>();
@@ -416,22 +398,18 @@ public class Ble_Activity extends Activity{
 
             // Loops through available Characteristics.
             // 對於當前迴圈所指向的服務中的每一個特徵值
-            for (final BluetoothGattCharacteristic gattCharacteristic : gattCharacteristics)
-            {
+            for (final BluetoothGattCharacteristic gattCharacteristic : gattCharacteristics) {
                 charas.add(gattCharacteristic);
                 HashMap<String, String> currentCharaData = new HashMap<String, String>();
                 uuid = gattCharacteristic.getUuid().toString();
 
                 if (gattCharacteristic.getUuid().toString()
-                        .equals(HEART_RATE_MEASUREMENT))
-                {
+                        .equals(HEART_RATE_MEASUREMENT)) {
                     // 測試讀取當前Characteristic資料，會觸發mOnDataAvailable.onCharacteristicRead()
-                    mhandler.postDelayed(new Runnable()
-                    {
+                    mhandler.postDelayed(new Runnable() {
 
                         @Override
-                        public void run()
-                        {
+                        public void run() {
                             // TODO Auto-generated method stub
                             mBluetoothLeService
                                     .readCharacteristic(gattCharacteristic);
@@ -448,8 +426,7 @@ public class Ble_Activity extends Activity{
                 }
                 List<BluetoothGattDescriptor> descriptors = gattCharacteristic
                         .getDescriptors();
-                for (BluetoothGattDescriptor descriptor : descriptors)
-                {
+                for (BluetoothGattDescriptor descriptor : descriptors) {
                     System.out.println("---descriptor UUID:"
                             + descriptor.getUuid());
                     // 獲取特徵值的描述
@@ -469,23 +446,23 @@ public class Ble_Activity extends Activity{
 
     }
 
-    private void setPhoneNumBLE(){
-        String str=SET_PHONE+inputPhoneNum.getText().length()+"!"+inputPhoneNum.getText();
-        Log.d("proto",str);
+    private void setPhoneNumBLE() {
+        String str = SET_PHONE + inputPhoneNum.getText().length() + "!" + inputPhoneNum.getText();
+        Log.d("proto", str);
         target_chara.setValue(str);
         mBluetoothLeService.writeCharacteristic(target_chara);
     }
 
-    private void setWifiSSIDBLE(){
-        String str = SET_WIFI_SSID+ spinnerWifiSSID.getSelectedItem().toString().length()+"!"+spinnerWifiSSID.getSelectedItem().toString();
-        Log.d("proto",str);
+    private void setWifiSSIDBLE() {
+        String str = SET_WIFI_SSID + spinnerWifiSSID.getSelectedItem().toString().length() + "!" + spinnerWifiSSID.getSelectedItem().toString();
+        Log.d("proto", str);
         target_chara.setValue(str);
         mBluetoothLeService.writeCharacteristic(target_chara);
     }
 
-    private void setSetWifiPwdBLE(){
-        String str = SET_WIFI_PWD+inputWifiPwd.getText().length()+"!"+inputWifiPwd.getText();
-        Log.d("proto",str);
+    private void setSetWifiPwdBLE() {
+        String str = SET_WIFI_PWD + inputWifiPwd.getText().length() + "!" + inputWifiPwd.getText();
+        Log.d("proto", str);
         target_chara.setValue(str);
         mBluetoothLeService.writeCharacteristic(target_chara);
     }

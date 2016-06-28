@@ -33,8 +33,8 @@ import maclab.eldercare.ui.Ble_Activity;
  **/
 
 /**
- * @Description: TODO<MainActivity類實現打開藍牙、掃描藍牙>
  * @author 廣州匯承資訊科技有限公司
+ * @Description: TODO<MainActivity類實現打開藍牙、掃描藍牙>
  * @data: 2014-10-12 上午10:28:18
  * @version: V1.0
  */
@@ -58,8 +58,7 @@ public class MainActivity extends Activity implements OnClickListener {
     private Handler mHandler;
     /**
      * 藍牙掃描回呼函數 實現掃描藍牙設備，回檔藍牙BluetoothDevice，可以獲取name MAC等資訊
-     *
-     * **/
+     **/
     private BluetoothAdapter.LeScanCallback mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
 
         @Override
@@ -70,7 +69,7 @@ public class MainActivity extends Activity implements OnClickListener {
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-					/* 講掃描到設備的資訊輸出到listview的適配器 */
+                    /* 講掃描到設備的資訊輸出到listview的適配器 */
                     mleDeviceListAdapter.addDevice(device, rssi);
                     mleDeviceListAdapter.notifyDataSetChanged();
                 }
@@ -108,8 +107,8 @@ public class MainActivity extends Activity implements OnClickListener {
                         .getDevice(position);
                 if (device == null)
                     return;
-                final Intent intent = new Intent(MainActivity.this,
-                        Ble_Activity.class);
+                final Intent intent = new Intent(MainActivity.this, Ble_Activity.class);
+
                 intent.putExtra(Ble_Activity.EXTRAS_DEVICE_NAME,
                         device.getName());
                 intent.putExtra(Ble_Activity.EXTRAS_DEVICE_ADDRESS,
@@ -136,11 +135,11 @@ public class MainActivity extends Activity implements OnClickListener {
     }
 
     /**
-     * @Title: init
-     * @Description: TODO(初始化UI控制項)
      * @param
      * @return void
      * @throws
+     * @Title: init
+     * @Description: TODO(初始化UI控制項)
      */
     private void init() {
         scan_btn = (Button) this.findViewById(R.id.scan_dev_btn);
@@ -150,11 +149,11 @@ public class MainActivity extends Activity implements OnClickListener {
     }
 
     /**
-     * @Title: init_ble
-     * @Description: TODO(初始化藍牙)
      * @param
      * @return void
      * @throws
+     * @Title: init_ble
+     * @Description: TODO(初始化藍牙)
      */
     private void init_ble() {
         // 手機硬體支援藍牙
@@ -195,12 +194,11 @@ public class MainActivity extends Activity implements OnClickListener {
     }
 
     /**
-     * @Title: scanLeDevice
-     * @Description: TODO(掃描藍牙設備)
-     * @param enable
-     *            (掃描使能，true:掃描開始,false:掃描停止)
+     * @param enable (掃描使能，true:掃描開始,false:掃描停止)
      * @return void
      * @throws
+     * @Title: scanLeDevice
+     * @Description: TODO(掃描藍牙設備)
      */
     private void scanLeDevice(final boolean enable) {
         if (enable) {
@@ -215,7 +213,7 @@ public class MainActivity extends Activity implements OnClickListener {
                     mBluetoothAdapter.stopLeScan(mLeScanCallback);
                 }
             }, SCAN_PERIOD);
-			/* 開始掃描藍牙設備，帶mLeScanCallback 回呼函數 */
+            /* 開始掃描藍牙設備，帶mLeScanCallback 回呼函數 */
             Log.i("SCAN", "begin.....................");
             mScanning = true;
             scan_flag = false;
@@ -231,8 +229,8 @@ public class MainActivity extends Activity implements OnClickListener {
     }
 
     /**
-     * @Description: TODO<自訂適配器Adapter,作為listview的適配器>
      * @author 廣州匯承資訊科技有限公司
+     * @Description: TODO<自訂適配器Adapter,作為listview的適配器>
      * @data: 2014-10-12 上午10:46:30
      * @version: V1.0
      */
@@ -281,8 +279,7 @@ public class MainActivity extends Activity implements OnClickListener {
 
         /**
          * 重寫getview
-         *
-         * **/
+         **/
         @Override
         public View getView(int i, View view, ViewGroup viewGroup) {
 
