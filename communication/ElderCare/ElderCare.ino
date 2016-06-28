@@ -9,6 +9,7 @@
 //3-axis
 #include <Wire.h>
 #include "MMA7660.h"
+#include <Grove_LED_Bar.h>
 
 #define WIFI_AUTH LWIFI_WPA  // choose from LWIFI_OPEN, LWIFI_WPA, or LWIFI_WEP.
 
@@ -24,6 +25,13 @@
 #define FALL_ALERT_THREAD 3
 #define WIFI_STATUS 4
 
+#define LED_SETUP 512
+#define LED_SET_PHONE 256
+#define LED_SET_WIFI 128
+#define LED_WIFI 64
+#define LED_HEART 8
+#define LED_CANCEL 2
+#define LED_FALL 1
 // ===3-axis accelemeter===
 MMA7660 accelemeter;
 const double SVM_THREASHOLD = 1.8;
@@ -68,6 +76,9 @@ String tcpcmd_led_off = "LED_Control,0";
 gpsSentenceInfoStruct info;
 char buff[256];
 
+// ===LED===
+Grove_LED_Bar bar(7, 6, 0);  // Clock pin, Data pin, Orientation
+int ledStatus = 0;
 // ===Thread Class===
 
 class MultiThread : public Thread
@@ -98,6 +109,7 @@ class MultiThread : public Thread
     char* parseGPGGA(const char* GPGGAstr);
     void callFamily();
     int id;
+    void turnLed(int ledNum, bool on);
 
     LWiFiClient c2;
 };
@@ -136,6 +148,8 @@ bool MultiThread::loop()
 
 // ===main===
 void setup() {
+  bar.begin();
+  bar.setBits(0);
   //Serial
   Serial.begin(9600);   // 與電腦序列埠連線
   //while (!Serial);
@@ -165,14 +179,18 @@ void setup() {
   Serial.println("LGPS Power on, and waiting ...");
   delay(3000);
 
-  digitalWrite(LED_PIN, LOW);
+  ledStatus = ledStatus|LED_SETUP;
+  bar.setBits(ledStatus);
   Serial.println("Setting done! Start looping!");
+
+  
 
   // start multi-thread
   main_thread_list->add_thread(new MultiThread(BLE_THREAD));
   main_thread_list->add_thread(new MultiThread(HEART_RATE_THREAD));
   main_thread_list->add_thread(new MultiThread(FALL_ALERT_THREAD));
   main_thread_list->add_thread(new MultiThread(WIFI_STATUS));
+
 }
 
 void MultiThread::senseFallGPS()
@@ -189,20 +207,27 @@ void MultiThread::senseFallGPS()
   Serial1.flush();
   if (SVM >= SVM_THREASHOLD)
   {
-    sendFallGPS();
-    callFamily();
-    delay(1000);
-    //10秒內等待觸摸取消鍵則取消緊急通報
-    int cancel = digitalRead(TOUCH_PIN);
+    turnLed(LED_FALL, true);
+    turnLed(LED_CANCEL, true);
+
+    //8秒內等待觸摸取消鍵則取消緊急通報
     unsigned long startTime = millis();         // 記錄開始時間
-    while (millis() - startTime < SENSE_HEART_SEC) {      // sense 10 seconds
-      if (TOUCH_PIN == 1)
+    while (millis() - startTime < 8000) {      // sense 8 seconds
+      if (digitalRead(TOUCH_PIN) == 1)
       {
-        sendCancel();
+        turnLed(LED_FALL, false);
+        delay(500);
+        turnLed(LED_CANCEL, false);
         delay(1000);
-        break;
+        return;
       }
     }
+    turnLed(LED_CANCEL, false);
+    sendFallGPS();
+    callFamily();
+    turnLed(LED_FALL, false);
+    delay(500);
+    
   }
 }
 
@@ -216,16 +241,17 @@ void MultiThread::listenBLE() {
   // 若收到藍牙模組的資料，則送到「序列埠監控視窗」
   if (Serial1.available()) {
     r = Serial1.read();
-    Serial.println(r);
     switch (r) {
       case SET_PHONE:
         phoneNum = readStr();
+        turnLed(LED_SET_PHONE, true);
         break;
       case SET_WIFI_SSID:
         wifiSSID = readStr();
         break;
       case SET_WIFI_PWD:
         wifiPwd = readStr();
+        turnLed(LED_SET_WIFI, true);
         connectAP();
         break;
     }
@@ -282,14 +308,15 @@ String MultiThread::cancelGPS()
 
 void MultiThread::showWifiStatus() {
   if (LWiFi.status() == LWIFI_STATUS_CONNECTED)
-    digitalWrite(LED_PIN, HIGH);
+    turnLed(LED_WIFI, true);
   else
-    digitalWrite(LED_PIN, LOW);
+    turnLed(LED_WIFI, false);
 }
 
 void MultiThread::sendHeartRate() {
   if(millis() - endTime >= WAIT_HEART_SEC) //sense 5 seconds, stop sensing for the next 55 seconds
   {
+    turnLed(LED_HEART, true);
     Serial.println("~~~send heartBeat~~~");
     String rate = senseHeartRate();
     String data = "HeartRate,," + rate;
@@ -297,6 +324,7 @@ void MultiThread::sendHeartRate() {
     Serial.println(data);
     pushDataToMCS(data);
     Serial.println("~~~send heartBeat end~~~");
+    turnLed(LED_HEART, false);
   }
 }
 
@@ -333,7 +361,7 @@ char* MultiThread::readStr() {
   }
   *rev = '\0';
   rev = tmp;
-  Serial.print("!!!");
+  Serial.print("Get from BLE : ");
   Serial.println(rev);
   return rev;
 }
@@ -364,6 +392,7 @@ void MultiThread::connectAP() {
   Serial.println("---------mcs information--------");
   getconnectInfo();
   Serial.println("---------------------------------");
+  turnLed(LED_WIFI, true);
 
 }
 
@@ -617,14 +646,24 @@ void MultiThread::callFamily() {
   {
     Serial.println("Start calling...");
     // call until press button
+    digitalRead(TOUCH_PIN);
     while(digitalRead(TOUCH_PIN) == LOW) {};
     delay(1000);
     LVoiceCall.hangCall();
+    delay(2000);
     Serial.println("Call Finished");
   }
   else{
     Serial.println("Call failed");
   }
   
+}
+
+void MultiThread::turnLed(int ledNum, bool on){
+  if(on)
+    ledStatus=ledStatus | ledNum;
+  else
+    ledStatus=ledStatus & (~ledNum);
+  bar.setBits(ledStatus);
 }
 
