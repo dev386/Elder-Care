@@ -1,6 +1,18 @@
 # Elder-Care
 An IOT project which helps elder to alert emergency events by using Linkit ONE, Android app and Mediatek Cloud Service.
 
+# File Structure
+ - **communication/**
+   - Linkit ONE code (.ino)
+ - **Doc/**
+   - Proposal document
+   - Oral proposal slide
+   - Report
+ - **ElderCare/**
+   - Android app code
+ - **Library/**
+   - Libraries used in Linkit ONE.(described in the following section)
+
 # Libraries used in this project
 
  -  [HttpClient](https://github.com/amcewen/HttpClient)
