@@ -23,3 +23,4 @@ An IOT project which helps elder to alert emergency events by using Linkit ONE, 
  
  -  [Grove_LED_Bar](https://github.com/Seeed-Studio/Grove_LED_Bar)
  
+ - 
